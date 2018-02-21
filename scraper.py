@@ -53,6 +53,7 @@ def scrape_individual_announcements(announcement):
 
     announcement['context'], announcement['locality'], announcement['halfMast'] = '', '', False
 
+    # TODO regex over both context and locality for state
     context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
     if context:
         context_text = context[0].get_text(strip=True)
