@@ -12,7 +12,7 @@ FLAGNETWORKLINK = "/government/australian-national-flag/flag-network"
 STATES_ABBR = ["australia-wide", "act", "nsw", "qld", "sa", "tas", "nt", "wa", "vic"]
 STATES_FULL = ["australia wide", "australian capital territory", "new south wales", "queensland", "south australia", "tasmania", "northern territory", "western australia", "victoria"]
 states_list = zip(STATES_ABBR, STATES_FULL)
-states_pattern = re.compile("\b(ACT|NSW|NT|VIC|WA|SA|TAS|QLD|Australian Capital Territory|New South Wales|Northern Territory|Victoria|Western Australia|South Australia|Tasmania|Queensland|Australia(-| )Wide)\b", re.IGNORECASE)
+states_pattern = re.compile(r"\b(ACT|NT|SA|WA|NSW|QLD|VIC|TAS|(Australia Capital|Northern) Territory|(South|Western) Australia|New South Wales|Queensland|Victoria|Tasmania|Australia( |-)wide)\b", re.IGNORECASE)
 
 rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK)
 soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -54,16 +54,15 @@ def scrape_individual_announcements(announcement):
 
     announcement['context'], announcement['locality'], announcement['halfMast'] = '', [], False
 
-    context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")
-    
+    context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
     if context:
         context_text = context[0].get_text(strip=True)
         if not is_date(context_text):
             announcement['context'] = context_text
             if context_text.lower().find("half-mast") or context_text.lower().find("half mast"):
                 announcement['halfMast'] = True
-    locality = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-salutation.field-type-text.field-label-hidden > div > div")
     
+    locality = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-salutation.field-type-text.field-label-hidden > div > div")
     if locality:
         locality_text = locality[0].get_text(strip=True)
         if not is_date(locality_text):
@@ -81,12 +80,4 @@ scrape_pages(soup)
 for announcement in all_announcements:
      scrape_individual_announcements(announcement)
 
-i = 0
-
-# # Write out to the sqlite database using scraperwiki library
-# scraperwiki.sqlite.save(unique_keys=['name'], data={"name": "susan", "occupation": "software developer"})
-
-# You can use whatever libraries you want: https://morph.io/documentation/python
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+scraperwiki.sqlite.save(['link'], all_announcements)
