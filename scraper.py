@@ -2,7 +2,7 @@
 
 from bs4 import BeautifulSoup
 import requests
-import logging
+import re
 import scraperwiki
 from dateutil.parser import parse
 
@@ -12,6 +12,7 @@ FLAGNETWORKLINK = "/government/australian-national-flag/flag-network"
 STATES_ABBR = ["australia-wide", "act", "nsw", "qld", "sa", "tas", "nt", "wa", "vic"]
 STATES_FULL = ["australia wide", "australian capital territory", "new south wales", "queensland", "south australia", "tasmania", "northern territory", "western australia", "victoria"]
 states_list = zip(STATES_ABBR, STATES_FULL)
+states_pattern = re.compile("\b(ACT|NSW|NT|VIC|WA|SA|TAS|QLD|Australian Capital Territory|New South Wales|Northern Territory|Victoria|Western Australia|South Australia|Tasmania|Queensland|Australia(-| )Wide)\b", re.IGNORECASE)
 
 rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK)
 soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -30,9 +31,8 @@ def is_date(string):
         return True # assume true, so it doesn't mess with the final data
 
 # on every page, get the title/link/dates of every announcement
-def scrape_pages():
+def scrape_pages(soup):
     for page in range(pages):
-        logging.info("Processing page " + str(page) + " of " + str(pages))
         if page != 0:
             rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK + "?page=" + str(page))
             soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -47,7 +47,8 @@ def scrape_pages():
             all_announcements.append({'title': content[0].get_text(strip=True), 'link': content[0].attrs['href'], 'date': content[1].get_text(strip=True)})
 
 # ∀ announcements, get the extra info from the headings (where does it apply, half-mast or not)
-for announcement in all_announcements:
+def scrape_individual_announcements(announcement):
+
     rFlagNetwork = requests.get(PMCTLD + announcement['link'])
     soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
@@ -66,11 +67,19 @@ for announcement in all_announcements:
     if locality:
         locality_text = locality[0].get_text(strip=True)
         if not is_date(locality_text):
-            matches = [x for x in list(states_list) if x in locality_text.lower()]
-            # clean the values so they're ABBRs
-            matches = [x if x not in dict(states_list) else dict(states_list)[x] for x in matches]
-            # [x[0] for x in list(zip(STATES_ABBR, STATES_FULL))]
-            announcement['locality'] = matches
+            matches = re.findall(states_pattern, locality_text)
+            announcement['locality'] = [x if x not in dict(states_list) else dict(states_list)[x] for x in matches]
+        
+        # if not is_date(locality_text):
+        #     matches = [x for x in (STATES_FULL + STATES_ABBR) if x in locality_text.lower().split()]
+        #     # clean the values so they're ABBRs
+        #     matches = [x if x not in dict(states_list) else dict(states_list)[x] for x in matches]
+        #     # [x[0] for x in list(zip(STATES_ABBR, STATES_FULL))]
+        #     announcement['locality'] = matches
+
+scrape_pages(soup)
+for announcement in all_announcements:
+     scrape_individual_announcements(announcement)
 
 i = 0
 
