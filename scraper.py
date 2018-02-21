@@ -9,10 +9,10 @@ from dateutil.parser import parse
 PMCTLD = "http://pmc.gov.au"
 FLAGNETWORKLINK = "/government/australian-national-flag/flag-network"
 
-STATES_ABBR = ["australia-wide", "act", "nsw", "qld", "sa", "tas", "nt", "wa", "vic"]
+STATES_ABBR = ["Australia-wide", "ACT", "NSW", "QLD", "SA", "TAS", "NT", "WA", "VIC"]
 STATES_FULL = ["australia wide", "australian capital territory", "new south wales", "queensland", "south australia", "tasmania", "northern territory", "western australia", "victoria"]
-states_list = zip(STATES_ABBR, STATES_FULL)
-states_pattern = re.compile(r"\b(ACT|NT|SA|WA|NSW|QLD|VIC|TAS|(Australia Capital|Northern) Territory|(South|Western) Australia|New South Wales|Queensland|Victoria|Tasmania|Australia( |-)wide)\b", re.IGNORECASE)
+states_list = dict(zip(STATES_FULL, STATES_ABBR))
+states_pattern = re.compile(r"\b(?:ACT|NT|SA|WA|NSW|QLD|VIC|TAS|(?:Australian Capital|Northern) Territory|(?:South|Western) Australia|New South Wales|Queensland|Victoria|Tasmania|Australia(?: |-)wide)\b", re.IGNORECASE)
 
 rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK)
 soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -37,9 +37,9 @@ def scrape_pages(soup):
             rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK + "?page=" + str(page))
             soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
+        # weird bug when combinding css selector, so I've just split it into two
         page_content1 = soup.select("#block-system-main > div > div > div > div.view-content > div.views-row > div.views-field.views-field-title > h2 > a")
         page_content2 = soup.select("#block-system-main > div > div > div > div.view-content > div.views-row > div.views-field.views-field-field-action-date > h3 > span")
-
         page_content = page_content1 + page_content2
 
         for i in range(-(-len(page_content) // 2)):
@@ -48,11 +48,10 @@ def scrape_pages(soup):
 
 # ∀ announcements, get the extra info from the headings (where does it apply, half-mast or not)
 def scrape_individual_announcements(announcement):
-
     rFlagNetwork = requests.get(PMCTLD + announcement['link'])
     soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
-    announcement['context'], announcement['locality'], announcement['halfMast'] = '', [], False
+    announcement['context'], announcement['locality'], announcement['halfMast'] = '', '', False
 
     context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
     if context:
@@ -65,16 +64,9 @@ def scrape_individual_announcements(announcement):
     locality = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-salutation.field-type-text.field-label-hidden > div > div")
     if locality:
         locality_text = locality[0].get_text(strip=True)
-        if not is_date(locality_text):
-            matches = re.findall(states_pattern, locality_text)
-            announcement['locality'] = [x if x not in dict(states_list) else dict(states_list)[x] for x in matches]
-        
-        # if not is_date(locality_text):
-        #     matches = [x for x in (STATES_FULL + STATES_ABBR) if x in locality_text.lower().split()]
-        #     # clean the values so they're ABBRs
-        #     matches = [x if x not in dict(states_list) else dict(states_list)[x] for x in matches]
-        #     # [x[0] for x in list(zip(STATES_ABBR, STATES_FULL))]
-        #     announcement['locality'] = matches
+        #if not is_date(locality_text):
+        matches = re.findall(states_pattern, locality_text)
+        announcement['locality'] = ','.join([states_list.get(item.lower(), item) for item in matches])
 
 scrape_pages(soup)
 for announcement in all_announcements:
