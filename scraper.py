@@ -3,7 +3,6 @@
 from bs4 import BeautifulSoup
 import requests
 import re
-import scraperwiki
 from dateutil.parser import parse
 
 PMCTLD = "http://pmc.gov.au"
