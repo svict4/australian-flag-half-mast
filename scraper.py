@@ -3,6 +3,7 @@
 from bs4 import BeautifulSoup
 import requests
 import re
+import sqlite3
 from dateutil.parser import parse
 
 PMCTLD = "http://pmc.gov.au"
@@ -72,4 +73,24 @@ scrape_pages(soup)
 for announcement in all_announcements:
      scrape_individual_announcements(announcement)
 
-scraperwiki.sqlite.save(['link'], all_announcements)
+con = sqlite3.connect("data.sqlite")
+cur = con.cursor()
+cur.execute("""CREATE TABLE IF NOT EXISTS data ( 
+    title TEXT NOT NULL,
+    link TEXT NOT NULL PRIMARY KEY,
+    actionDate TEXT NOT NULL,
+    context TEXT,
+    locality TEXT,
+    halfMast INTEGER NOT NULL
+    ) WITHOUT ROWID""")
+
+cur.executemany("""
+    INSERT INTO data (
+        title, link, actionDate, context, locality, halfMast
+    ) VALUES (
+        :text, :link, :actionDate, :context, :locality, :halfMast
+    )""", all_announcements)
+
+con.commit()
+cur.close()
+con.close()

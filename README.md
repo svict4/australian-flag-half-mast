@@ -2,5 +2,5 @@ This is a scraper that runs on [Morph](https://morph.io). To get started [see th
 
 This scraper reads the PM&C Flag Network for all announcements and returns the following format:
 
-title |	link to announcement |	date |	context |	locality |	(bool) halfMast
+title |	URL to announcement |	date for action |	context |	locality (state or australia-wide) |	`bool` halfMast
 --- | --- | --- | --- | --- | ---
