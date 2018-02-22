@@ -13,6 +13,7 @@ STATES_ABBR = ["Australia-wide", "ACT", "NSW", "QLD", "SA", "TAS", "NT", "WA", "
 STATES_FULL = ["australia wide", "australian capital territory", "new south wales", "queensland", "south australia", "tasmania", "northern territory", "western australia", "victoria"]
 states_list = dict(zip(STATES_FULL, STATES_ABBR))
 states_pattern = re.compile(r"\b(?:ACT|NT|SA|WA|NSW|QLD|VIC|TAS|(?:Australian Capital|Northern) Territory|(?:South|Western) Australia|New South Wales|Queensland|Victoria|Tasmania|Australia(?: |-)wide)\b", re.IGNORECASE)
+halfMast_pattern = re.compile(r"half(?: |-)mast", re.IGNORECASE)
 
 rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK)
 soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -51,23 +52,19 @@ def scrape_individual_announcements(announcement):
     rFlagNetwork = requests.get(PMCTLD + announcement['link'])
     soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
-    announcement['context'], announcement['locality'], announcement['halfMast'] = '', '', False
+    announcement['context'], announcement['locality'], announcement['halfMast'] = '', '', ''
 
-    # TODO regex over both context and locality for state
-    context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
-    if context:
-        context_text = context[0].get_text(strip=True)
-        if not is_date(context_text):
-            announcement['context'] = context_text
-            if context_text.lower().find("half-mast") or context_text.lower().find("half mast"):
-                announcement['halfMast'] = True
-    
     locality = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-salutation.field-type-text.field-label-hidden > div > div")
     if locality:
         locality_text = locality[0].get_text(strip=True)
         #if not is_date(locality_text):
         matches = re.findall(states_pattern, locality_text)
         announcement['locality'] = ','.join([states_list.get(item.lower(), item) for item in matches])
+        announcement['halfMast'] = int(bool(re.search(halfMast_pattern, locality_text)))
+
+    context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
+    if context and !(announcement['halfMast']):
+        announcement['halfMast'] = int(bool(re.search(halfMast_pattern, context[0].get_text(strip=True))))
 
 scrape_pages(soup)
 for announcement in all_announcements:
@@ -81,15 +78,16 @@ cur.execute("""CREATE TABLE IF NOT EXISTS data (
     actionDate TEXT NOT NULL,
     context TEXT,
     locality TEXT,
-    halfMast INTEGER NOT NULL
+    halfMast BOOL NOT NULL
     ) WITHOUT ROWID""")
 
+data = [tuple(i.values()) for i in all_announcements]
 cur.executemany("""
     INSERT INTO data (
         title, link, actionDate, context, locality, halfMast
     ) VALUES (
         :text, :link, :actionDate, :context, :locality, :halfMast
-    )""", all_announcements)
+    )""", data)
 
 con.commit()
 cur.close()
