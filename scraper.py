@@ -18,7 +18,7 @@ halfMast_pattern = re.compile(r"half(?: |-)mast", re.IGNORECASE)
 rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK)
 soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
-pages = int(soup.select("#block-system-main > div > div > div > div.item-list > ul > li.pager-last.last > a")[0].attrs['href'].split("=")[1])
+pages = int(soup.select("#block-system-main > div > div > div > div.item-list > ul > li.pager-last.last > a")[0].attrs['href'].split("=")[1]) + 1
 
 all_announcements = [] # pipe this into the sqlite db for morph.io
 
@@ -34,6 +34,7 @@ def is_date(string):
 # on every page, get the title/link/dates of every announcement
 def scrape_pages(soup):
     for page in range(pages):
+        print("scraping ", str(page + 1), "of", str(pages), "pages")
         if page != 0:
             rFlagNetwork = requests.get(PMCTLD + FLAGNETWORKLINK + "?page=" + str(page))
             soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
@@ -49,10 +50,11 @@ def scrape_pages(soup):
 
 # ∀ announcements, get the extra info from the headings (where does it apply, half-mast or not)
 def scrape_individual_announcements(announcement):
+    print("scraping", announcement['link'])
     rFlagNetwork = requests.get(PMCTLD + announcement['link'])
     soup = BeautifulSoup(rFlagNetwork.content, "html.parser")
 
-    announcement['context'], announcement['locality'], announcement['halfMast'] = '', '', ''
+    announcement['locality'], announcement['halfMast'] = '', ''
 
     locality = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-salutation.field-type-text.field-label-hidden > div > div")
     if locality:
@@ -63,7 +65,7 @@ def scrape_individual_announcements(announcement):
         announcement['halfMast'] = int(bool(re.search(halfMast_pattern, locality_text)))
 
     context = soup.select(".node-flag-alert > div.content.clearfix > div.field.field-name-field-alert-sub-title.field-type-text.field-label-hidden > div > div")  
-    if context and !(announcement['halfMast']):
+    if context and not announcement['halfMast']:
         announcement['halfMast'] = int(bool(re.search(halfMast_pattern, context[0].get_text(strip=True))))
 
 scrape_pages(soup)
@@ -72,21 +74,21 @@ for announcement in all_announcements:
 
 con = sqlite3.connect("data.sqlite")
 cur = con.cursor()
-cur.execute("""CREATE TABLE IF NOT EXISTS data ( 
-    title TEXT NOT NULL,
-    link TEXT NOT NULL PRIMARY KEY,
-    actionDate TEXT NOT NULL,
-    context TEXT,
-    locality TEXT,
-    halfMast BOOL NOT NULL
+cur.execute("DROP TABLE IF EXISTS `data`")
+cur.execute("""CREATE TABLE `data` ( 
+        title TEXT NOT NULL,
+        link TEXT NOT NULL PRIMARY KEY,
+        actionDate TEXT NOT NULL,
+        locality TEXT,
+        halfMast BOOL NOT NULL
     ) WITHOUT ROWID""")
 
 data = [tuple(i.values()) for i in all_announcements]
 cur.executemany("""
     INSERT INTO data (
-        title, link, actionDate, context, locality, halfMast
+        title, link, actionDate, locality, halfMast
     ) VALUES (
-        :text, :link, :actionDate, :context, :locality, :halfMast
+        :text, :link, :actionDate, :locality, :halfMast
     )""", data)
 
 con.commit()
