@@ -81,7 +81,7 @@ cur.execute("""CREATE TABLE `data` (
         actionDate TEXT NOT NULL,
         locality TEXT,
         halfMast BOOL NOT NULL
-    ) WITHOUT ROWID""")
+    )""")
 
 data = [tuple(i.values()) for i in all_announcements]
 cur.executemany("""
